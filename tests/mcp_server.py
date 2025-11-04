@@ -68,6 +68,34 @@ async def get_image_resource_link() -> ResourceLink:
     )
 
 
+@mcp.tool(annotations=ToolAnnotations(title='Collatz Conjecture sequence generator'))
+async def collatz_conjecture(n: int) -> TextContent:
+    """Generate the Collatz conjecture sequence for a given number.
+    This tool attaches response metadata.
+
+    Args:
+        n: The starting number for the Collatz sequence.
+    Returns:
+        A list representing the Collatz sequence.
+    """
+    if n <= 0:
+        raise ValueError('Startig number for the Collatz conjecture must be a positive integer.')
+
+    sequence = [n]
+    while n != 1:
+        if n % 2 == 0:
+            n = n // 2
+        else:
+            n = 3 * n + 1
+        sequence.append(n)
+    response = TextContent(type='text', text=str(sequence))
+    # attach metadata to the response
+    if response.meta is None:
+        response.meta = {}
+    response.meta['pydantic_ai'] = {'tool': 'collatz_conjecture', 'length': len(sequence)}
+    return response
+
+
 @mcp.resource('resource://kiwi.png', mime_type='image/png')
 async def kiwi_resource() -> bytes:
     return Path(__file__).parent.joinpath('assets/kiwi.png').read_bytes()
