@@ -257,17 +257,17 @@ class MCPServer(AbstractToolset[Any], ABC):
             if isinstance(structured, dict) and len(structured) == 1 and 'result' in structured:
                 return (
                     messages.ToolReturn(return_value=structured['result'], metadata=result.meta)
-                    if getattr(result, '_meta', None)
+                    if getattr(result, '_meta', None) is not None
                     else structured['result']
                 )
             return (
                 messages.ToolReturn(return_value=structured, metadata=result.meta)
-                if getattr(result, '_meta', None)
+                if getattr(result, '_meta', None) is not None
                 else structured
             )
 
         mapped = [await self._map_tool_result_part(part) for part in result.content]
-        if getattr(result, '_meta', None):
+        if getattr(result, '_meta', None) is not None:
             return (
                 messages.ToolReturn(return_value=mapped[0], metadata=result.meta)
                 if len(mapped) == 1
