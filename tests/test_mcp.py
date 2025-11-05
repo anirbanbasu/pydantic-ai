@@ -100,7 +100,6 @@ async def test_tool_response_metadata(run_context: RunContext[int]):
         # Test calling the Collatz conjecture generator tool
         result = await server.direct_call_tool('collatz_conjecture', {'n': 7})
         assert isinstance(result, ToolReturn)
-        assert isinstance(result.return_value, str)
         assert result.return_value == '[7, 22, 11, 34, 17, 52, 26, 13, 40, 20, 10, 5, 16, 8, 4, 2, 1]'
         assert result.metadata == {'pydantic_ai': {'tool': 'collatz_conjecture', 'length': 17}}
 

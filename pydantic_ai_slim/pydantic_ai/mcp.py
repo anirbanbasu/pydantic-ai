@@ -254,20 +254,23 @@ class MCPServer(AbstractToolset[Any], ABC):
         ):
             # The MCP SDK wraps primitives and generic types like list in a `result` key, but we want to use the raw value returned by the tool function.
             # See https://github.com/modelcontextprotocol/python-sdk#structured-output
-            if isinstance(structured, dict) and len(structured) == 1 and 'result' in structured:
+            if isinstance(structured, dict) and (
+                (len(structured) == 1 and 'result' in structured)
+                or (len(structured) == 2 and 'result' in structured and '_meta' in structured)
+            ):
                 return (
-                    messages.ToolReturn(return_value=structured['result'], metadata=result.meta)
-                    if getattr(result, '_meta', None) is not None
+                    messages.ToolReturn(return_value=structured['result'], metadata=structured['_meta'])
+                    if structured.get('_meta', None) is not None
                     else structured['result']
                 )
             return (
-                messages.ToolReturn(return_value=structured, metadata=result.meta)
-                if getattr(result, '_meta', None) is not None
+                messages.ToolReturn(return_value=structured, metadata=structured['_meta'])
+                if structured.get('_meta', None) is not None
                 else structured
             )
 
         mapped = [await self._map_tool_result_part(part) for part in result.content]
-        if getattr(result, '_meta', None) is not None:
+        if result.meta:
             return (
                 messages.ToolReturn(return_value=mapped[0], metadata=result.meta)
                 if len(mapped) == 1

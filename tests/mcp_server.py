@@ -69,7 +69,7 @@ async def get_image_resource_link() -> ResourceLink:
 
 
 @mcp.tool(annotations=ToolAnnotations(title='Collatz Conjecture sequence generator'))
-async def collatz_conjecture(n: int) -> TextContent:
+async def collatz_conjecture(n: int) -> dict[str, Any]:
     """Generate the Collatz conjecture sequence for a given number.
     This tool attaches response metadata.
 
@@ -88,11 +88,9 @@ async def collatz_conjecture(n: int) -> TextContent:
         else:
             n = 3 * n + 1
         sequence.append(n)
-    response = TextContent(type='text', text=str(sequence))
+    response: dict[str, Any] = {'result': str(sequence)}
     # attach metadata to the response
-    if response.meta is None:
-        response.meta = {}
-    response.meta['pydantic_ai'] = {'tool': 'collatz_conjecture', 'length': len(sequence)}
+    response['_meta'] = {'pydantic_ai': {'tool': 'collatz_conjecture', 'length': len(sequence)}}
     return response
 
 
