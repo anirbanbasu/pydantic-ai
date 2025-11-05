@@ -403,23 +403,71 @@ class MCPServer(AbstractToolset[Any], ABC):
                     pass
             return text if metadata is None else messages.ToolReturn(return_value=text, metadata=metadata)
         elif isinstance(part, mcp_types.ImageContent):
-            return messages.BinaryContent(data=base64.b64decode(part.data), media_type=part.mimeType)
+            binary_response = messages.BinaryContent(data=base64.b64decode(part.data), media_type=part.mimeType)
+            return (
+                binary_response
+                if metadata is None
+                else messages.ToolReturn(
+                    return_value=f'See file {binary_response.identifier}',
+                    content=[f'This is file {binary_response.identifier}:', binary_response],
+                    metadata=metadata,
+                )
+            )
         elif isinstance(part, mcp_types.AudioContent):
             # NOTE: The FastMCP server doesn't support audio content.
             # See <https://github.com/modelcontextprotocol/python-sdk/issues/952> for more details.
-            return messages.BinaryContent(
+            binary_response = messages.BinaryContent(
                 data=base64.b64decode(part.data), media_type=part.mimeType
             )  # pragma: no cover
+            return (
+                binary_response
+                if metadata is None
+                else messages.ToolReturn(
+                    return_value=f'See file {binary_response.identifier}',
+                    content=[f'This is file {binary_response.identifier}:', binary_response],
+                    metadata=metadata,
+                )
+            )
         elif isinstance(part, mcp_types.EmbeddedResource):
             resource = part.resource
-            return self._get_content(resource)
+            response = self._get_content(resource)
+            return (
+                response
+                if metadata is None
+                else messages.ToolReturn(
+                    return_value=response if isinstance(response, str) else f'See file {response.identifier}',
+                    content=None if isinstance(response, str) else [f'This is file {response.identifier}:', response],
+                    metadata=metadata,
+                )
+            )
         elif isinstance(part, mcp_types.ResourceLink):
             resource_result: mcp_types.ReadResourceResult = await self._client.read_resource(part.uri)
-            return (
-                self._get_content(resource_result.contents[0])
-                if len(resource_result.contents) == 1
-                else [self._get_content(resource) for resource in resource_result.contents]
-            )
+            if len(resource_result.contents) == 1:
+                response = self._get_content(resource_result.contents[0])
+                return (
+                    response
+                    if metadata is None
+                    else messages.ToolReturn(
+                        return_value=response if isinstance(response, str) else f'See file {response.identifier}',
+                        content=None
+                        if isinstance(response, str)
+                        else [f'This is file {response.identifier}:', response],
+                        metadata=metadata,
+                    )
+                )
+            else:
+                responses = [self._get_content(resource) for resource in resource_result.contents]
+                return [
+                    response
+                    if isinstance(response, str)
+                    else messages.ToolReturn(
+                        return_value=response if isinstance(response, str) else f'See file {response.identifier}',
+                        content=None
+                        if isinstance(response, str)
+                        else [f'This is file {response.identifier}:', response],
+                    )
+                    for response in responses
+                ]
         else:
             assert_never(part)
 
