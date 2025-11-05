@@ -78,7 +78,7 @@ async def test_stdio_server(run_context: RunContext[int]):
     server = MCPServerStdio('python', ['-m', 'tests.mcp_server'])
     async with server:
         tools = [tool.tool_def for tool in (await server.get_tools(run_context)).values()]
-        assert len(tools) == snapshot(19)
+        assert len(tools) == snapshot(20)
         assert tools[0].name == 'celsius_to_fahrenheit'
         assert isinstance(tools[0].description, str)
         assert tools[0].description.startswith('Convert Celsius to Fahrenheit.')
@@ -92,16 +92,30 @@ async def test_tool_response_metadata(run_context: RunContext[int]):
     server = MCPServerStdio('python', ['-m', 'tests.mcp_server'])
     async with server:
         tools = [tool.tool_def for tool in (await server.get_tools(run_context)).values()]
-        assert len(tools) == snapshot(19)
-        assert tools[4].name == 'collatz_conjecture'
+        assert len(tools) == snapshot(20)
+        assert tools[4].name == 'get_collatz_conjecture'
         assert isinstance(tools[4].description, str)
         assert tools[4].description.startswith('Generate the Collatz conjecture sequence for a given number.')
 
-        # Test calling the Collatz conjecture generator tool
-        result = await server.direct_call_tool('collatz_conjecture', {'n': 7})
+        result = await server.direct_call_tool('get_collatz_conjecture', {'n': 7})
         assert isinstance(result, ToolReturn)
-        assert result.return_value == '[7, 22, 11, 34, 17, 52, 26, 13, 40, 20, 10, 5, 16, 8, 4, 2, 1]'
-        assert result.metadata == {'pydantic_ai': {'tool': 'collatz_conjecture', 'length': 17}}
+        assert result.return_value == snapshot([7, 22, 11, 34, 17, 52, 26, 13, 40, 20, 10, 5, 16, 8, 4, 2, 1])
+        assert result.metadata == snapshot({'pydantic_ai': {'tool': 'collatz_conjecture', 'n': 7, 'length': 17}})
+
+
+async def test_tool_structured_response_metadata(run_context: RunContext[int]):
+    server = MCPServerStdio('python', ['-m', 'tests.mcp_server'])
+    async with server:
+        tools = [tool.tool_def for tool in (await server.get_tools(run_context)).values()]
+        assert len(tools) == snapshot(20)
+        assert tools[5].name == 'get_structured_text_content_with_metadata'
+        assert isinstance(tools[5].description, str)
+        assert tools[5].description.startswith('Return structured dict with metadata.')
+
+        result = await server.direct_call_tool('get_structured_text_content_with_metadata', {})
+        assert isinstance(result, ToolReturn)
+        assert result.return_value == 'This is some text content.'
+        assert result.metadata == snapshot({'pydantic_ai': {'source': 'get_structured_text_content_with_metadata'}})
 
 
 async def test_reentrant_context_manager():
@@ -155,7 +169,7 @@ async def test_stdio_server_with_cwd(run_context: RunContext[int]):
     server = MCPServerStdio('python', ['mcp_server.py'], cwd=test_dir)
     async with server:
         tools = await server.get_tools(run_context)
-        assert len(tools) == snapshot(19)
+        assert len(tools) == snapshot(20)
 
 
 async def test_process_tool_call(run_context: RunContext[int]) -> int:

@@ -68,18 +68,20 @@ async def get_image_resource_link() -> ResourceLink:
     )
 
 
-@mcp.tool(annotations=ToolAnnotations(title='Collatz Conjecture sequence generator'))
-async def collatz_conjecture(n: int) -> dict[str, Any]:
+@mcp.tool(structured_output=False, annotations=ToolAnnotations(title='Collatz Conjecture sequence generator'))
+async def get_collatz_conjecture(n: int) -> TextContent:
     """Generate the Collatz conjecture sequence for a given number.
     This tool attaches response metadata.
 
     Args:
         n: The starting number for the Collatz sequence.
     Returns:
-        A list representing the Collatz sequence.
+        A list representing the Collatz sequence with attached metadata.
     """
     if n <= 0:
-        raise ValueError('Startig number for the Collatz conjecture must be a positive integer.')
+        raise ValueError('Starting number for the Collatz conjecture must be a positive integer.')
+
+    input_param_n = n  # store the original input value
 
     sequence = [n]
     while n != 1:
@@ -88,10 +90,21 @@ async def collatz_conjecture(n: int) -> dict[str, Any]:
         else:
             n = 3 * n + 1
         sequence.append(n)
-    response: dict[str, Any] = {'result': str(sequence)}
-    # attach metadata to the response
-    response['_meta'] = {'pydantic_ai': {'tool': 'collatz_conjecture', 'length': len(sequence)}}
-    return response
+
+    return TextContent(
+        type='text',
+        text=str(sequence),
+        _meta={'pydantic_ai': {'tool': 'collatz_conjecture', 'n': input_param_n, 'length': len(sequence)}},
+    )
+
+
+@mcp.tool()
+async def get_structured_text_content_with_metadata() -> dict[str, Any]:
+    """Return structured dict with metadata."""
+    return {
+        'result': 'This is some text content.',
+        '_meta': {'pydantic_ai': {'source': 'get_structured_text_content_with_metadata'}},
+    }
 
 
 @mcp.resource('resource://kiwi.png', mime_type='image/png')

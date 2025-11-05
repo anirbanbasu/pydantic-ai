@@ -270,12 +270,6 @@ class MCPServer(AbstractToolset[Any], ABC):
             )
 
         mapped = [await self._map_tool_result_part(part) for part in result.content]
-        if result.meta:
-            return (
-                messages.ToolReturn(return_value=mapped[0], metadata=result.meta)
-                if len(mapped) == 1
-                else [messages.ToolReturn(return_value=mapped_item, metadata=result.meta) for mapped_item in mapped]
-            )
         return mapped[0] if len(mapped) == 1 else mapped
 
     async def call_tool(
@@ -391,17 +385,23 @@ class MCPServer(AbstractToolset[Any], ABC):
 
     async def _map_tool_result_part(
         self, part: mcp_types.ContentBlock
-    ) -> str | messages.BinaryContent | dict[str, Any] | list[Any]:
+    ) -> str | messages.ToolReturn | messages.BinaryContent | dict[str, Any] | list[Any]:
         # See https://github.com/jlowin/fastmcp/blob/main/docs/servers/tools.mdx#return-values
 
+        # Let's also check for metadata but it can be present in not just TextContent
+        metadata: dict[str, Any] | None = part.meta
         if isinstance(part, mcp_types.TextContent):
             text = part.text
             if text.startswith(('[', '{')):
                 try:
-                    return pydantic_core.from_json(text)
+                    return (
+                        pydantic_core.from_json(text)
+                        if metadata is None
+                        else messages.ToolReturn(return_value=pydantic_core.from_json(text), metadata=metadata)
+                    )
                 except ValueError:
                     pass
-            return text
+            return text if metadata is None else messages.ToolReturn(return_value=text, metadata=metadata)
         elif isinstance(part, mcp_types.ImageContent):
             return messages.BinaryContent(data=base64.b64decode(part.data), media_type=part.mimeType)
         elif isinstance(part, mcp_types.AudioContent):
