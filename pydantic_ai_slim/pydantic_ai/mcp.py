@@ -254,23 +254,80 @@ class MCPServer(AbstractToolset[Any], ABC):
         ):
             # The MCP SDK wraps primitives and generic types like list in a `result` key, but we want to use the raw value returned by the tool function.
             # See https://github.com/modelcontextprotocol/python-sdk#structured-output
-            if isinstance(structured, dict) and (
-                (len(structured) == 1 and 'result' in structured)
-                or (len(structured) == 2 and 'result' in structured and '_meta' in structured)
-            ):
+            if isinstance(structured, dict) and len(structured) == 1 and 'result' in structured:
                 return (
-                    messages.ToolReturn(return_value=structured['result'], metadata=structured['_meta'])
-                    if structured.get('_meta', None) is not None
+                    messages.ToolReturn(return_value=structured['result'], metadata=result.meta)
+                    if result.meta
                     else structured['result']
                 )
-            return (
-                messages.ToolReturn(return_value=structured, metadata=structured['_meta'])
-                if structured.get('_meta', None) is not None
-                else structured
-            )
+            return messages.ToolReturn(return_value=structured, metadata=result.meta) if result.meta else structured
 
-        mapped = [await self._map_tool_result_part(part) for part in result.content]
-        return mapped[0] if len(mapped) == 1 else mapped
+        mapped_part_metadata_tuple_list = [await self._map_tool_result_part(part) for part in result.content]
+        if (
+            all(mapped_part_metadata_tuple[1] is None for mapped_part_metadata_tuple in mapped_part_metadata_tuple_list)
+            and result.meta is None
+        ):
+            # There is no metadata in the tool result or its parts, return just the mapped values
+            return (
+                mapped_part_metadata_tuple_list[0][0]
+                if len(mapped_part_metadata_tuple_list[0]) == 1
+                else [mapped_part_metadata_tuple[0] for mapped_part_metadata_tuple in mapped_part_metadata_tuple_list]
+            )
+        elif (
+            all(mapped_part_metadata_tuple[1] is None for mapped_part_metadata_tuple in mapped_part_metadata_tuple_list)
+            and result.meta is not None
+        ):
+            # There is no metadata in the tool result parts, but there is metadata in the tool result
+            return messages.ToolReturn(
+                return_value=(
+                    mapped_part_metadata_tuple_list[0][0]
+                    if len(mapped_part_metadata_tuple_list[0]) == 1
+                    else [
+                        mapped_part_metadata_tuple[0] for mapped_part_metadata_tuple in mapped_part_metadata_tuple_list
+                    ]
+                ),
+                metadata=result.meta,
+            )
+        else:
+            # There is metadata in the tool result parts and there may be a metadata in the tool result, return a ToolReturn object
+            return_values: list[Any] = []
+            user_contents: list[Any] = []
+            return_metadata: dict[str, Any] = {}
+            for idx, (mapped_part, part_metadata) in enumerate(mapped_part_metadata_tuple_list):
+                if part_metadata is not None:
+                    # Merge the metadata dictionaries, with part metadata taking precedence
+                    if return_metadata.get('content', None) is None:
+                        # Create an empty list if it doesn't exist yet
+                        return_metadata['content'] = list[dict[str, Any]]()
+                    return_metadata['content'].append({str(idx): part_metadata})
+                if isinstance(mapped_part, messages.BinaryContent):
+                    identifier = mapped_part.identifier
+
+                    return_values.append(f'See file {identifier}')
+                    user_contents.append([f'This is file {identifier}:', mapped_part])
+                else:
+                    user_contents.append(mapped_part)
+
+            if result.meta is not None and return_metadata.get('content', None) is not None:
+                # Merge the tool result metadata into the return metadata, with part metadata taking precedence
+                return_metadata['result'] = result.meta
+            elif result.meta is not None and return_metadata.get('content', None) is None:
+                return_metadata = result.meta
+            elif (
+                result.meta is None
+                and return_metadata.get('content', None) is not None
+                and len(return_metadata['content']) == 1
+            ):
+                # If there is only one content metadata, unwrap it
+                return_metadata = return_metadata['content'][0]
+            # TODO: What else should we cover here?
+
+            # Finally, construct and return the ToolReturn object
+            return messages.ToolReturn(
+                return_value=return_values,
+                content=user_contents,
+                metadata=return_metadata,
+            )
 
     async def call_tool(
         self,
@@ -385,87 +442,32 @@ class MCPServer(AbstractToolset[Any], ABC):
 
     async def _map_tool_result_part(
         self, part: mcp_types.ContentBlock
-    ) -> str | messages.ToolReturn | messages.BinaryContent | dict[str, Any] | list[Any]:
+    ) -> tuple[str | messages.BinaryContent | dict[str, Any] | list[Any], dict[str, Any] | None]:
         # See https://github.com/jlowin/fastmcp/blob/main/docs/servers/tools.mdx#return-values
 
-        # Let's also check for metadata but it can be present in not just TextContent
         metadata: dict[str, Any] | None = part.meta
         if isinstance(part, mcp_types.TextContent):
             text = part.text
             if text.startswith(('[', '{')):
                 try:
-                    return (
-                        pydantic_core.from_json(text)
-                        if metadata is None
-                        else messages.ToolReturn(return_value=pydantic_core.from_json(text), metadata=metadata)
-                    )
+                    return pydantic_core.from_json(text), metadata
                 except ValueError:
                     pass
-            return text if metadata is None else messages.ToolReturn(return_value=text, metadata=metadata)
+            return text, metadata
         elif isinstance(part, mcp_types.ImageContent):
-            binary_response = messages.BinaryContent(data=base64.b64decode(part.data), media_type=part.mimeType)
-            return (
-                binary_response
-                if metadata is None
-                else messages.ToolReturn(
-                    return_value=f'See file {binary_response.identifier}',
-                    content=[f'This is file {binary_response.identifier}:', binary_response],
-                    metadata=metadata,
-                )
-            )
-        elif isinstance(part, mcp_types.AudioContent):
+            return messages.BinaryContent(data=base64.b64decode(part.data), media_type=part.mimeType), metadata
+        elif isinstance(part, mcp_types.AudioContent):  # pragma: no cover
             # NOTE: The FastMCP server doesn't support audio content.
             # See <https://github.com/modelcontextprotocol/python-sdk/issues/952> for more details.
-            binary_response = messages.BinaryContent(data=base64.b64decode(part.data), media_type=part.mimeType)
-            return (  # pragma: no cover
-                binary_response
-                if metadata is None
-                else messages.ToolReturn(
-                    return_value=f'See file {binary_response.identifier}',
-                    content=[f'This is file {binary_response.identifier}:', binary_response],
-                    metadata=metadata,
-                )
-            )
+            return messages.BinaryContent(data=base64.b64decode(part.data), media_type=part.mimeType), metadata
         elif isinstance(part, mcp_types.EmbeddedResource):
-            resource = part.resource
-            response = self._get_content(resource)
-            return (
-                response
-                if metadata is None
-                else messages.ToolReturn(
-                    return_value=response if isinstance(response, str) else f'See file {response.identifier}',
-                    content=None if isinstance(response, str) else [f'This is file {response.identifier}:', response],
-                    metadata=metadata,
-                )
-            )
+            return self._get_content(part.resource), metadata
         elif isinstance(part, mcp_types.ResourceLink):
             resource_result: mcp_types.ReadResourceResult = await self._client.read_resource(part.uri)
             if len(resource_result.contents) == 1:
-                response = self._get_content(resource_result.contents[0])
-                return (
-                    response
-                    if metadata is None
-                    else messages.ToolReturn(
-                        return_value=response if isinstance(response, str) else f'See file {response.identifier}',
-                        content=None
-                        if isinstance(response, str)
-                        else [f'This is file {response.identifier}:', response],
-                        metadata=metadata,
-                    )
-                )
+                return self._get_content(resource_result.contents[0]), metadata
             else:
-                responses = [self._get_content(resource) for resource in resource_result.contents]  # pragma: no cover
-                return [  # pragma: no cover
-                    response
-                    if isinstance(response, str)
-                    else messages.ToolReturn(
-                        return_value=response if isinstance(response, str) else f'See file {response.identifier}',
-                        content=None
-                        if isinstance(response, str)
-                        else [f'This is file {response.identifier}:', response],
-                    )
-                    for response in responses
-                ]
+                return [self._get_content(resource) for resource in resource_result.contents], metadata
         else:
             assert_never(part)
 
@@ -941,7 +943,7 @@ ToolResult = (
     | messages.ToolReturn
     | dict[str, Any]
     | list[Any]
-    | Sequence[str | messages.BinaryContent | messages.ToolReturn | dict[str, Any] | list[Any]]
+    | Sequence[str | messages.BinaryContent | dict[str, Any] | list[Any]]
 )
 """The result type of an MCP tool call."""
 
