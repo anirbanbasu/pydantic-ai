@@ -254,38 +254,23 @@ class MCPServer(AbstractToolset[Any], ABC):
         ):
             # The MCP SDK wraps primitives and generic types like list in a `result` key, but we want to use the raw value returned by the tool function.
             # See https://github.com/modelcontextprotocol/python-sdk#structured-output
-            if isinstance(structured, dict) and len(structured) == 1 and 'result' in structured:
-                return (
-                    messages.ToolReturn(return_value=structured['result'], metadata=result.meta)
-                    if result.meta
-                    else structured['result']
-                )
-            return messages.ToolReturn(return_value=structured, metadata=result.meta) if result.meta else structured
-
-        mapped_part_metadata_tuple_list = [await self._map_tool_result_part(part) for part in result.content]
-        if (
-            all(mapped_part_metadata_tuple[1] is None for mapped_part_metadata_tuple in mapped_part_metadata_tuple_list)
-            and result.meta is None
-        ):
-            # There is no metadata in the tool result or its parts, return just the mapped values
-            return (
-                mapped_part_metadata_tuple_list[0][0]
-                if len(mapped_part_metadata_tuple_list[0]) == 1
-                else [mapped_part_metadata_tuple[0] for mapped_part_metadata_tuple in mapped_part_metadata_tuple_list]
+            return_value = (
+                structured['result']
+                if isinstance(structured, dict) and len(structured) == 1 and 'result' in structured
+                else structured
             )
-        elif (
-            all(mapped_part_metadata_tuple[1] is None for mapped_part_metadata_tuple in mapped_part_metadata_tuple_list)
-            and result.meta is not None
-        ):
+            return messages.ToolReturn(return_value=return_value, metadata=result.meta) if result.meta else return_value
+
+        parts_with_metadata = [await self._map_tool_result_part(part) for part in result.content]
+        parts_only = [mapped_part for mapped_part, _ in parts_with_metadata]
+        any_part_has_metadata = any(metadata is not None for _, metadata in parts_with_metadata)
+        if not any_part_has_metadata and result.meta is None:
+            # There is no metadata in the tool result or its parts, return just the mapped values
+            return parts_only[0] if len(parts_only) == 1 else parts_only
+        elif not any_part_has_metadata and result.meta is not None:
             # There is no metadata in the tool result parts, but there is metadata in the tool result
             return messages.ToolReturn(
-                return_value=(
-                    mapped_part_metadata_tuple_list[0][0]
-                    if len(mapped_part_metadata_tuple_list[0]) == 1
-                    else [
-                        mapped_part_metadata_tuple[0] for mapped_part_metadata_tuple in mapped_part_metadata_tuple_list
-                    ]
-                ),
+                return_value=(parts_only[0] if len(parts_only) == 1 else parts_only),
                 metadata=result.meta,
             )
         else:
@@ -293,12 +278,10 @@ class MCPServer(AbstractToolset[Any], ABC):
             return_values: list[Any] = []
             user_contents: list[Any] = []
             return_metadata: dict[str, Any] = {}
-            for idx, (mapped_part, part_metadata) in enumerate(mapped_part_metadata_tuple_list):
+            return_metadata.setdefault('content', [])
+            for idx, (mapped_part, part_metadata) in enumerate(parts_with_metadata):
                 if part_metadata is not None:
                     # Merge the metadata dictionaries, with part metadata taking precedence
-                    if return_metadata.get('content', None) is None:
-                        # Create an empty list if it doesn't exist yet
-                        return_metadata['content'] = list[dict[str, Any]]()
                     return_metadata['content'].append({str(idx): part_metadata})
                 if isinstance(mapped_part, messages.BinaryContent):
                     identifier = mapped_part.identifier
