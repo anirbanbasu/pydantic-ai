@@ -282,6 +282,7 @@ class MCPServer(AbstractToolset[Any], ABC):
             for idx, (part, part_metadata) in enumerate(parts_with_metadata):
                 if part_metadata is not None:
                     parts_metadata[idx] = part_metadata
+                # TODO: Keep updated with the multimodal content parsing in _agent_graph.py
                 if isinstance(part, messages.BinaryContent):
                     identifier = part.identifier
 
