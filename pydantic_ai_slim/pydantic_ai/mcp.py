@@ -272,24 +272,23 @@ class MCPServer(AbstractToolset[Any], ABC):
 
         parts_with_metadata = [await self._map_tool_result_part(part) for part in result.content]
         parts_only = [part for part, _ in parts_with_metadata]
-        any_part_has_metadata = any(metadata is not None for _, metadata in parts_with_metadata)
+        # any_part_has_metadata = any(metadata is not None for _, metadata in parts_with_metadata)
         return_values: list[Any] = []
         user_contents: list[Any] = []
         parts_metadata: dict[int, dict[str, Any]] = {}
         return_metadata: dict[str, Any] = {}
-        if any_part_has_metadata:
-            # There is metadata in the tool result parts and there may be a metadata in the tool result, return a ToolReturn object
-            for idx, (part, part_metadata) in enumerate(parts_with_metadata):
-                if part_metadata is not None:
-                    parts_metadata[idx] = part_metadata
-                # TODO: Keep updated with the multimodal content parsing in _agent_graph.py
-                if isinstance(part, messages.BinaryContent):
-                    identifier = part.identifier
+        # if any_part_has_metadata:
+        for idx, (part, part_metadata) in enumerate(parts_with_metadata):
+            if part_metadata is not None:
+                parts_metadata[idx] = part_metadata
+            # TODO: Keep updated with the multimodal content parsing in _agent_graph.py
+            if isinstance(part, messages.BinaryContent):
+                identifier = part.identifier
 
-                    return_values.append(f'See file {identifier}')
-                    user_contents.append([f'This is file {identifier}:', part])
-                else:
-                    user_contents.append(part)
+                return_values.append(f'See file {identifier}')
+                user_contents.append([f'This is file {identifier}:', part])
+            else:
+                user_contents.append(part)
 
         if len(parts_metadata) > 0:
             if result.meta is not None and len(result.meta) > 0:
@@ -453,6 +452,28 @@ class MCPServer(AbstractToolset[Any], ABC):
             return self._get_content(part.resource), metadata
         elif isinstance(part, mcp_types.ResourceLink):
             resource_result: mcp_types.ReadResourceResult = await self._client.read_resource(part.uri)
+            # Check if metadata already exists. If so, merge it with nested the resource metadata.
+            parts_metadata: dict[int, dict[str, Any]] = {}
+            nested_metadata: dict[str, Any] = {}
+            for idx, content in enumerate(resource_result.contents):
+                if content.meta is not None:
+                    parts_metadata[idx] = content.meta
+            if len(parts_metadata) > 0:
+                if resource_result.meta is not None and len(resource_result.meta) > 0:
+                    # Merge the tool result metadata and parts metadata into the return metadata
+                    nested_metadata = {'result': resource_result.meta, 'content': parts_metadata}
+                else:
+                    # Only parts metadata exists
+                    if len(parts_metadata) == 1:
+                        # If there is only one content metadata, unwrap it
+                        nested_metadata = parts_metadata[0]
+                    else:
+                        nested_metadata = {'content': parts_metadata}
+            else:
+                if resource_result.meta is not None and len(resource_result.meta) > 0:
+                    nested_metadata = resource_result.meta
+            # FIXME: Is this a correct assumption? If metadata was read from the part then that is the same as resource_result.meta
+            metadata = nested_metadata
             if len(resource_result.contents) == 1:
                 return self._get_content(resource_result.contents[0]), metadata
             else:
