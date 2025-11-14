@@ -271,55 +271,51 @@ class MCPServer(AbstractToolset[Any], ABC):
             return messages.ToolReturn(return_value=return_value, metadata=result.meta) if result.meta else return_value
 
         parts_with_metadata = [await self._map_tool_result_part(part) for part in result.content]
-        parts_only = [mapped_part for mapped_part, _ in parts_with_metadata]
+        parts_only = [part for part, _ in parts_with_metadata]
         any_part_has_metadata = any(metadata is not None for _, metadata in parts_with_metadata)
-        if not any_part_has_metadata and result.meta is None:
-            # There is no metadata in the tool result or its parts, return just the mapped values
-            return parts_only[0] if len(parts_only) == 1 else parts_only
-        elif not any_part_has_metadata and result.meta is not None:
-            # There is no metadata in the tool result parts, but there is metadata in the tool result
-            return messages.ToolReturn(
-                return_value=(parts_only[0] if len(parts_only) == 1 else parts_only),
-                metadata=result.meta,
-            )
-        else:
+        return_values: list[Any] = []
+        user_contents: list[Any] = []
+        parts_metadata: dict[int, dict[str, Any]] = {}
+        return_metadata: dict[str, Any] = {}
+        if any_part_has_metadata:
             # There is metadata in the tool result parts and there may be a metadata in the tool result, return a ToolReturn object
-            return_values: list[Any] = []
-            user_contents: list[Any] = []
-            return_metadata: dict[str, Any] = {}
-            return_metadata.setdefault('content', [])
-            for idx, (mapped_part, part_metadata) in enumerate(parts_with_metadata):
+            for idx, (part, part_metadata) in enumerate(parts_with_metadata):
                 if part_metadata is not None:
-                    # Merge the metadata dictionaries, with part metadata taking precedence
-                    return_metadata['content'].append({str(idx): part_metadata})
-                if isinstance(mapped_part, messages.BinaryContent):
-                    identifier = mapped_part.identifier
+                    parts_metadata[idx] = part_metadata
+                if isinstance(part, messages.BinaryContent):
+                    identifier = part.identifier
 
                     return_values.append(f'See file {identifier}')
-                    user_contents.append([f'This is file {identifier}:', mapped_part])
+                    user_contents.append([f'This is file {identifier}:', part])
                 else:
-                    user_contents.append(mapped_part)
+                    user_contents.append(part)
 
-            if result.meta is not None and return_metadata.get('content', None) is not None:
-                # Merge the tool result metadata into the return metadata, with part metadata taking precedence
-                return_metadata['result'] = result.meta
-            elif result.meta is not None and return_metadata.get('content', None) is None:
+        if len(parts_metadata) > 0:
+            if result.meta is not None and len(result.meta) > 0:
+                # Merge the tool result metadata and parts metadata into the return metadata
+                return_metadata = {'result': result.meta, 'content': parts_metadata}
+            else:
+                # Only parts metadata exists
+                if len(parts_metadata) == 1:
+                    # If there is only one content metadata, unwrap it
+                    return_metadata = parts_metadata[0]
+                else:
+                    return_metadata = {'content': parts_metadata}
+        else:
+            if result.meta is not None and len(result.meta) > 0:
                 return_metadata = result.meta
-            elif (
-                result.meta is None
-                and return_metadata.get('content', None) is not None
-                and len(return_metadata['content']) == 1
-            ):
-                # If there is only one content metadata, unwrap it
-                return_metadata = return_metadata['content'][0]
-            # TODO: What else should we cover here?
+        # TODO: What else should we cover here?
 
-            # Finally, construct and return the ToolReturn object
-            return messages.ToolReturn(
+        # Finally, construct and return the ToolReturn object
+        return (
+            messages.ToolReturn(
                 return_value=return_values,
                 content=user_contents,
                 metadata=return_metadata,
             )
+            if len(return_metadata) > 0
+            else (parts_only[0] if len(parts_only) == 1 else parts_only)
+        )
 
     async def call_tool(
         self,
