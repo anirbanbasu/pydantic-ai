@@ -8,7 +8,7 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '1182'
+      - '1097'
       content-type:
       - application/json
       host:
@@ -19,9 +19,7 @@ interactions:
       - parts:
         - text: What was the temperature in London 1st January 2022?
         role: user
-      generationConfig:
-        responseModalities:
-        - TEXT
+      generationConfig: {}
       systemInstruction:
         parts:
         - text: You are a helpful chatbot.
@@ -40,46 +38,45 @@ interactions:
             <description>The temperature in degrees Celsius.</description>
             </returns>
           name: temperature
-          parameters_json_schema:
-            additionalProperties: false
+          parameters:
             properties:
               city:
                 description: The city name.
-                type: string
+                type: STRING
               date:
                 description: 'The date. (format: date)'
-                type: string
+                type: STRING
             required:
             - city
             - date
-            type: object
+            type: OBJECT
         - description: The final response which ends this conversation
           name: final_result
-          parameters_json_schema:
+          parameters:
             properties:
               city:
-                type: string
+                type: STRING
               date:
                 description: 'Format: date'
-                type: string
+                type: STRING
               temperature:
-                type: string
+                type: STRING
             required:
             - temperature
             - date
             - city
-            type: object
-    uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
+            type: OBJECT
+    uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent
   response:
     headers:
       alt-svc:
       - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
       content-length:
-      - '818'
+      - '819'
       content-type:
       - application/json; charset=UTF-8
       server-timing:
-      - gfet4t7; dur=835
+      - gfet4t7; dur=779
       transfer-encoding:
       - chunked
       vary:
@@ -88,7 +85,7 @@ interactions:
       - Referer
     parsed_body:
       candidates:
-      - avgLogprobs: -8.080582899440611e-06
+      - avgLogprobs: -0.010357145752225603
         content:
           parts:
           - functionCall:
@@ -98,18 +95,18 @@ interactions:
               name: temperature
           role: model
         finishReason: STOP
-      modelVersion: gemini-2.0-flash
-      responseId: IvsgabDNFcqHz7IPgc2O8Ak
+      modelVersion: gemini-1.5-flash
+      responseId: wVpeaPHCL5W1nvgP-O3vwQY
       usageMetadata:
         candidatesTokenCount: 14
         candidatesTokensDetails:
         - modality: TEXT
           tokenCount: 14
-        promptTokenCount: 69
+        promptTokenCount: 101
         promptTokensDetails:
         - modality: TEXT
-          tokenCount: 69
-        totalTokenCount: 83
+          tokenCount: 101
+        totalTokenCount: 115
     status:
       code: 200
       message: OK
@@ -122,7 +119,7 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '1594'
+      - '1437'
       content-type:
       - application/json
       host:
@@ -138,20 +135,17 @@ interactions:
             args:
               city: London
               date: '2022-01-01'
-            id: pyd_ai_9526b1a5c88049ba818b5a35fb6228d3
+            id: pyd_ai_2155ddd4169345fa81a4f4f606f7b6e2
             name: temperature
-          thoughtSignature: Y29udGV4dF9lbmdpbmVlcmluZ19pc190aGVfd2F5X3RvX2dv
         role: model
       - parts:
         - functionResponse:
-            id: pyd_ai_9526b1a5c88049ba818b5a35fb6228d3
+            id: pyd_ai_2155ddd4169345fa81a4f4f606f7b6e2
             name: temperature
             response:
               return_value: 30°C
         role: user
-      generationConfig:
-        responseModalities:
-        - TEXT
+      generationConfig: {}
       systemInstruction:
         parts:
         - text: You are a helpful chatbot.
@@ -170,46 +164,45 @@ interactions:
             <description>The temperature in degrees Celsius.</description>
             </returns>
           name: temperature
-          parameters_json_schema:
-            additionalProperties: false
+          parameters:
             properties:
               city:
                 description: The city name.
-                type: string
+                type: STRING
               date:
                 description: 'The date. (format: date)'
-                type: string
+                type: STRING
             required:
             - city
             - date
-            type: object
+            type: OBJECT
         - description: The final response which ends this conversation
           name: final_result
-          parameters_json_schema:
+          parameters:
             properties:
               city:
-                type: string
+                type: STRING
               date:
                 description: 'Format: date'
-                type: string
+                type: STRING
               temperature:
-                type: string
+                type: STRING
             required:
             - temperature
             - date
             - city
-            type: object
-    uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
+            type: OBJECT
+    uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent
   response:
     headers:
       alt-svc:
       - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
       content-length:
-      - '860'
+      - '862'
       content-type:
       - application/json; charset=UTF-8
       server-timing:
-      - gfet4t7; dur=699
+      - gfet4t7; dur=860
       transfer-encoding:
       - chunked
       vary:
@@ -218,7 +211,7 @@ interactions:
       - Referer
     parsed_body:
       candidates:
-      - avgLogprobs: -0.00036509230821615173
+      - avgLogprobs: -0.0004957949831372215
         content:
           parts:
           - functionCall:
@@ -229,18 +222,18 @@ interactions:
               name: final_result
           role: model
         finishReason: STOP
-      modelVersion: gemini-2.0-flash
-      responseId: I_sgafe-BLLBz7IP0buJgQc
+      modelVersion: gemini-1.5-flash
+      responseId: wlpeaP6kI9OvnvgPgYfPiQY
       usageMetadata:
         candidatesTokenCount: 21
         candidatesTokensDetails:
         - modality: TEXT
           tokenCount: 21
-        promptTokenCount: 91
+        promptTokenCount: 123
         promptTokensDetails:
         - modality: TEXT
-          tokenCount: 91
-        totalTokenCount: 112
+          tokenCount: 123
+        totalTokenCount: 144
     status:
       code: 200
       message: OK

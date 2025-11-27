@@ -807,6 +807,7 @@ def infer_model(  # noqa: C901
         'heroku',
         'moonshotai',
         'ollama',
+        'openrouter',
         'together',
         'vercel',
         'litellm',
@@ -837,10 +838,6 @@ def infer_model(  # noqa: C901
         from .cohere import CohereModel
 
         return CohereModel(model_name, provider=provider)
-    elif model_kind == 'openrouter':
-        from .openrouter import OpenRouterModel
-
-        return OpenRouterModel(model_name, provider=provider)
     elif model_kind == 'mistral':
         from .mistral import MistralModel
 

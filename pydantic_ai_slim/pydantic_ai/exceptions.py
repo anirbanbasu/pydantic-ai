@@ -22,7 +22,6 @@ __all__ = (
     'AgentRunError',
     'UnexpectedModelBehavior',
     'UsageLimitExceeded',
-    'ModelAPIError',
     'ModelHTTPError',
     'IncompleteToolCall',
     'FallbackExceptionGroup',
@@ -152,31 +151,27 @@ class UnexpectedModelBehavior(AgentRunError):
             return self.message
 
 
-class ModelAPIError(AgentRunError):
-    """Raised when a model provider API request fails."""
-
-    model_name: str
-    """The name of the model associated with the error."""
-
-    def __init__(self, model_name: str, message: str):
-        self.model_name = model_name
-        super().__init__(message)
-
-
-class ModelHTTPError(ModelAPIError):
+class ModelHTTPError(AgentRunError):
     """Raised when an model provider response has a status code of 4xx or 5xx."""
 
     status_code: int
     """The HTTP status code returned by the API."""
 
+    model_name: str
+    """The name of the model associated with the error."""
+
     body: object | None
     """The body of the response, if available."""
 
+    message: str
+    """The error message with the status code and response body, if available."""
+
     def __init__(self, status_code: int, model_name: str, body: object | None = None):
         self.status_code = status_code
+        self.model_name = model_name
         self.body = body
         message = f'status_code: {status_code}, model_name: {model_name}, body: {body}'
-        super().__init__(model_name=model_name, message=message)
+        super().__init__(message)
 
 
 class FallbackExceptionGroup(ExceptionGroup[Any]):

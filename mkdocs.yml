@@ -32,9 +32,8 @@ nav:
           - models/bedrock.md
           - models/cohere.md
           - models/groq.md
-          - models/huggingface.md
           - models/mistral.md
-          - models/openrouter.md
+          - models/huggingface.md
           - models/outlines.md
       - Tools & Toolsets:
           - tools.md

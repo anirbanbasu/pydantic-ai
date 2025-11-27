@@ -63,7 +63,7 @@ from pydantic_ai.result import RunUsage
 from pydantic_ai.tools import ToolDefinition
 from pydantic_ai.usage import RequestUsage
 
-from ..conftest import ClientWithHandler, IsBytes, IsDatetime, IsInstance, IsNow, IsStr, TestEnv, try_import
+from ..conftest import ClientWithHandler, IsDatetime, IsInstance, IsNow, IsStr, TestEnv, try_import
 
 pytestmark = [
     pytest.mark.anyio,
@@ -138,21 +138,28 @@ async def test_model_tools(allow_model_requests: None):
                 {
                     'name': 'foo',
                     'description': 'This is foo',
-                    'parameters_json_schema': {'type': 'object', 'properties': {'bar': {'type': 'number'}}},
+                    'parameters': {
+                        'type': 'object',
+                        'title': 'Foo',
+                        'properties': {'bar': {'type': 'number', 'title': 'Bar'}},
+                    },
                 },
                 {
                     'name': 'apple',
                     'description': 'This is apple',
-                    'parameters_json_schema': {
+                    'parameters': {
                         'type': 'object',
-                        'properties': {'banana': {'type': 'array', 'items': {'type': 'number'}}},
+                        'properties': {
+                            'banana': {'type': 'array', 'title': 'Banana', 'items': {'type': 'number', 'title': 'Bar'}}
+                        },
                     },
                 },
                 {
                     'name': 'result',
                     'description': 'This is the tool for the final Result',
-                    'parameters_json_schema': {
+                    'parameters': {
                         'type': 'object',
+                        'title': 'Result',
                         'properties': {'spam': {'type': 'number'}},
                         'required': ['spam'],
                     },
@@ -186,7 +193,7 @@ async def test_require_response_tool(allow_model_requests: None):
                 {
                     'name': 'result',
                     'description': 'This is the tool for the final Result',
-                    'parameters_json_schema': {'type': 'object', 'properties': {'spam': {'type': 'number'}}},
+                    'parameters': {'type': 'object', 'title': 'Result', 'properties': {'spam': {'type': 'number'}}},
                 }
             ]
         }
@@ -274,9 +281,16 @@ async def test_json_def_replaced(allow_model_requests: None):
                 {
                     'name': 'result',
                     'description': 'This is the tool for the final Result',
-                    'parameters_json_schema': {
-                        'properties': {'locations': {'items': {'$ref': '#/$defs/Location'}, 'type': 'array'}},
+                    'parameters': {
+                        'properties': {
+                            'locations': {
+                                'items': {'$ref': '#/$defs/Location'},
+                                'title': 'Locations',
+                                'type': 'array',
+                            }
+                        },
                         'required': ['locations'],
+                        'title': 'Locations',
                         'type': 'object',
                         '$defs': {
                             'Axis': {
@@ -284,23 +298,27 @@ async def test_json_def_replaced(allow_model_requests: None):
                                     'label': {
                                         'default': '<unlabeled axis>',
                                         'description': 'The label of the axis',
+                                        'title': 'Label',
                                         'type': 'string',
                                     }
                                 },
+                                'title': 'Axis',
                                 'type': 'object',
                             },
                             'Chart': {
                                 'properties': {'x_axis': {'$ref': '#/$defs/Axis'}, 'y_axis': {'$ref': '#/$defs/Axis'}},
                                 'required': ['x_axis', 'y_axis'],
+                                'title': 'Chart',
                                 'type': 'object',
                             },
                             'Location': {
                                 'properties': {
-                                    'lat': {'type': 'number'},
-                                    'lng': {'default': 1.1, 'type': 'number'},
+                                    'lat': {'title': 'Lat', 'type': 'number'},
+                                    'lng': {'default': 1.1, 'title': 'Lng', 'type': 'number'},
                                     'chart': {'$ref': '#/$defs/Chart'},
                                 },
                                 'required': ['lat', 'chart'],
+                                'title': 'Location',
                                 'type': 'object',
                             },
                         },
@@ -359,18 +377,22 @@ async def test_json_def_enum(allow_model_requests: None):
                 {
                     'name': 'result',
                     'description': 'This is the tool for the final Result',
-                    'parameters_json_schema': {
+                    'parameters': {
                         'properties': {
                             'progress': {
                                 'default': None,
+                                'title': 'Progress',
                                 'anyOf': [
                                     {'items': {'$ref': '#/$defs/ProgressEnum'}, 'type': 'array'},
                                     {'type': 'null'},
                                 ],
                             }
                         },
+                        'title': 'QueryDetails',
                         'type': 'object',
-                        '$defs': {'ProgressEnum': {'enum': [100, 80, 60, 40, 20], 'type': 'integer'}},
+                        '$defs': {
+                            'ProgressEnum': {'enum': [100, 80, 60, 40, 20], 'title': 'ProgressEnum', 'type': 'integer'}
+                        },
                     },
                 }
             ]
@@ -408,15 +430,20 @@ async def test_json_def_replaced_any_of(allow_model_requests: None):
                 {
                     'name': 'result',
                     'description': 'This is the tool for the final Result',
-                    'parameters_json_schema': {
+                    'parameters': {
                         'properties': {
                             'op_location': {'default': None, 'anyOf': [{'$ref': '#/$defs/Location'}, {'type': 'null'}]}
                         },
+                        'title': 'Locations',
                         'type': 'object',
                         '$defs': {
                             'Location': {
-                                'properties': {'lat': {'type': 'number'}, 'lng': {'type': 'number'}},
+                                'properties': {
+                                    'lat': {'title': 'Lat', 'type': 'number'},
+                                    'lng': {'title': 'Lng', 'type': 'number'},
+                                },
                                 'required': ['lat', 'lng'],
+                                'title': 'Location',
                                 'type': 'object',
                             }
                         },
@@ -469,14 +496,15 @@ async def test_json_def_date(allow_model_requests: None):
                 {
                     'name': 'result',
                     'description': 'This is the tool for the final Result',
-                    'parameters_json_schema': {
+                    'parameters': {
                         'properties': {
-                            'd': {'type': 'string', 'description': 'Format: date'},
-                            'dt': {'type': 'string', 'description': 'Format: date-time'},
-                            't': {'description': 'Format: time', 'type': 'string'},
-                            'td': {'description': 'my timedelta (format: duration)', 'type': 'string'},
+                            'd': {'title': 'D', 'type': 'string', 'description': 'Format: date'},
+                            'dt': {'title': 'Dt', 'type': 'string', 'description': 'Format: date-time'},
+                            't': {'description': 'Format: time', 'title': 'T', 'type': 'string'},
+                            'td': {'description': 'my timedelta (format: duration)', 'title': 'Td', 'type': 'string'},
                         },
                         'required': ['d', 'dt', 't', 'td'],
+                        'title': 'FormattedStringFields',
                         'type': 'object',
                     },
                 }
@@ -1020,10 +1048,7 @@ async def test_empty_text_ignored():
         {
             'role': 'model',
             'parts': [
-                {
-                    'function_call': {'name': 'final_result', 'args': {'response': [1, 2, 123]}},
-                    'thought_signature': b'context_engineering_is_the_way_to_go',
-                },
+                {'function_call': {'name': 'final_result', 'args': {'response': [1, 2, 123]}}},
                 {'text': 'xxx'},
             ],
         }
@@ -1036,12 +1061,7 @@ async def test_empty_text_ignored():
     assert content == snapshot(
         {
             'role': 'model',
-            'parts': [
-                {
-                    'function_call': {'name': 'final_result', 'args': {'response': [1, 2, 123]}},
-                    'thought_signature': b'context_engineering_is_the_way_to_go',
-                }
-            ],
+            'parts': [{'function_call': {'name': 'final_result', 'args': {'response': [1, 2, 123]}}}],
         }
     )
 
@@ -1174,7 +1194,7 @@ async def test_safety_settings_safe(
 async def test_image_as_binary_content_tool_response(
     allow_model_requests: None, gemini_api_key: str, image_content: BinaryContent
 ) -> None:
-    m = GeminiModel('gemini-3-pro-preview', provider=GoogleGLAProvider(api_key=gemini_api_key))
+    m = GeminiModel('gemini-2.5-pro-preview-03-25', provider=GoogleGLAProvider(api_key=gemini_api_key))
     agent = Agent(m)
 
     @agent.tool_plain
@@ -1194,14 +1214,21 @@ async def test_image_as_binary_content_tool_response(
                 run_id=IsStr(),
             ),
             ModelResponse(
-                parts=[ToolCallPart(tool_name='get_image', args={}, tool_call_id=IsStr())],
+                parts=[
+                    TextPart(
+                        content="""\
+I need to use the `get_image` tool to see the image first.
+
+"""
+                    ),
+                    ToolCallPart(tool_name='get_image', args={}, tool_call_id=IsStr()),
+                ],
                 usage=RequestUsage(
-                    input_tokens=33, output_tokens=74, details={'thoughts_tokens': 64, 'text_prompt_tokens': 33}
+                    input_tokens=38, output_tokens=389, details={'thoughts_tokens': 361, 'text_prompt_tokens': 38}
                 ),
-                model_name='gemini-3-pro-preview',
+                model_name='gemini-2.5-pro-preview-03-25',
                 timestamp=IsDatetime(),
                 provider_details={'finish_reason': 'STOP'},
-                provider_response_id=IsStr(),
                 run_id=IsStr(),
             ),
             ModelRequest(
@@ -1215,10 +1242,7 @@ async def test_image_as_binary_content_tool_response(
                     UserPromptPart(
                         content=[
                             'This is file 1c8566:',
-                            BinaryContent(
-                                data=IsBytes(),
-                                media_type='image/png',
-                            ),
+                            image_content,
                         ],
                         timestamp=IsDatetime(),
                     ),
@@ -1226,43 +1250,15 @@ async def test_image_as_binary_content_tool_response(
                 run_id=IsStr(),
             ),
             ModelResponse(
-                parts=[
-                    TextPart(content='6'),
-                    TextPart(
-                        content="""\
- 1c8566
-The image shows a **kiwi** fruit that has been sliced in half.
-
-You can see:
-*   The **bright green flesh**.
-*   The ring of tiny **black seeds**.
-*   The **white core** in the center.
-*   The fuzzy **brown skin** around the outside.
-
-It's positioned against a plain white background.\
-"""
-                    ),
-                    TextPart(
-                        content="""\
-The fruit in the image is a **kiwi** (specifically, a sliced green kiwifruit).
-
-You can clearly identify it by its signature features:
-*   **Green flesh** with a radial pattern.
-*   A ring of small **black seeds**.
-*   A cream-colored **white core** in the center.
-*   Fuzzy **brown skin** visible on the exterior edge.\
-"""
-                    ),
-                ],
+                parts=[TextPart(content='The image shows a kiwi fruit, sliced in half.')],
                 usage=RequestUsage(
-                    input_tokens=1185,
-                    output_tokens=552,
-                    details={'thoughts_tokens': 381, 'image_prompt_tokens': 1107, 'text_prompt_tokens': 78},
+                    input_tokens=360,
+                    output_tokens=212,
+                    details={'thoughts_tokens': 201, 'text_prompt_tokens': 102, 'image_prompt_tokens': 258},
                 ),
-                model_name='gemini-3-pro-preview',
+                model_name='gemini-2.5-pro-preview-03-25',
                 timestamp=IsDatetime(),
                 provider_details={'finish_reason': 'STOP'},
-                provider_response_id=IsStr(),
                 run_id=IsStr(),
             ),
         ]
@@ -1365,7 +1361,7 @@ async def test_gemini_drop_exclusive_maximum(allow_model_requests: None, gemini_
 
     result = await agent.run('I want to know my chinese zodiac. I am 17 years old.')
     assert result.output == snapshot(
-        'I am sorry, I cannot provide you with your Chinese zodiac sign because you are not old enough. You must be at least 18 years old.'
+        'I am sorry, I cannot fulfill this request. The age needs to be greater than 18.\n'
     )
 
 
@@ -1403,7 +1399,7 @@ class CurrentLocation(BaseModel, extra='forbid'):
 
 @pytest.mark.vcr()
 async def test_gemini_additional_properties_is_false(allow_model_requests: None, gemini_api_key: str):
-    m = GeminiModel('gemini-2.0-flash', provider=GoogleGLAProvider(api_key=gemini_api_key))
+    m = GeminiModel('gemini-1.5-flash', provider=GoogleGLAProvider(api_key=gemini_api_key))
     agent = Agent(m)
 
     @agent.tool_plain
@@ -1412,14 +1408,14 @@ async def test_gemini_additional_properties_is_false(allow_model_requests: None,
 
     result = await agent.run('What is the temperature in Tokyo?')
     assert result.output == snapshot(
-        'I need the country to find the temperature in Tokyo. Could you please tell me which country Tokyo is in?\n'
+        'The available tools lack the ability to access real-time information, including current temperature.  Therefore, I cannot answer your question.\n'
     )
 
 
 @pytest.mark.vcr()
 async def test_gemini_additional_properties_is_true(allow_model_requests: None, gemini_api_key: str):
     """Test that additionalProperties with schemas now work natively (no warning since Nov 2025 announcement)."""
-    m = GeminiModel('gemini-2.5-flash', provider=GoogleGLAProvider(api_key=gemini_api_key))
+    m = GeminiModel('gemini-1.5-flash', provider=GoogleGLAProvider(api_key=gemini_api_key))
     agent = Agent(m)
 
     @agent.tool_plain
@@ -1428,7 +1424,7 @@ async def test_gemini_additional_properties_is_true(allow_model_requests: None, 
 
     result = await agent.run('What is the temperature in Tokyo?')
     assert result.output == snapshot(
-        'I was not able to get the temperature in Tokyo. There seems to be an issue with the way the location is being processed by the tool.'
+        'I need a location dictionary to use the `get_temperature` function.  I cannot provide the temperature in Tokyo without more information.\n'
     )
 
 
@@ -1947,7 +1943,7 @@ async def test_gemini_native_output(allow_model_requests: None, gemini_api_key: 
                     )
                 ],
                 usage=RequestUsage(
-                    input_tokens=8, output_tokens=20, details={'text_prompt_tokens': 8, 'text_candidates_tokens': 20}
+                    input_tokens=17, output_tokens=20, details={'text_prompt_tokens': 17, 'text_candidates_tokens': 20}
                 ),
                 model_name='gemini-2.0-flash',
                 timestamp=IsDatetime(),
